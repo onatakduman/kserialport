@@ -1,4 +1,4 @@
-package com.onatakduman.serialport
+package com.onatakduman.kserialport
 
 import java.io.File
 import java.io.IOException

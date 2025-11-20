@@ -1,4 +1,4 @@
-package com.onatakduman.serialport
+package com.onatakduman.kserialport
 
 import android.util.Log
 import java.io.File

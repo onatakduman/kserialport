@@ -1,4 +1,4 @@
-package com.onatakduman.serialport
+package com.onatakduman.kserialport
 
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.flow.Flow

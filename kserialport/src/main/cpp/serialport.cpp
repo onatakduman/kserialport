@@ -14,7 +14,7 @@
 extern "C" {
 
 JNIEXPORT jobject JNICALL
-Java_com_onatakduman_serialport_SerialPortJNI_open(JNIEnv *env, jobject thiz, jstring path, jint flags) {
+Java_com_onatakduman_kserialport_SerialPortJNI_open(JNIEnv *env, jobject thiz, jstring path, jint flags) {
     const char *path_utf = env->GetStringUTFChars(path, 0);
     if (path_utf == nullptr) {
         return nullptr;
@@ -39,7 +39,7 @@ Java_com_onatakduman_serialport_SerialPortJNI_open(JNIEnv *env, jobject thiz, js
 }
 
 JNIEXPORT void JNICALL
-Java_com_onatakduman_serialport_SerialPortJNI_close(JNIEnv *env, jobject thiz, jobject fileDescriptor) {
+Java_com_onatakduman_kserialport_SerialPortJNI_close(JNIEnv *env, jobject thiz, jobject fileDescriptor) {
     jclass fileDescriptorClass = env->FindClass("java/io/FileDescriptor");
     jfieldID descriptorField = env->GetFieldID(fileDescriptorClass, "descriptor", "I");
     int fd = env->GetIntField(fileDescriptor, descriptorField);
@@ -89,7 +89,7 @@ static speed_t getBaudRate(jint baudRate) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_onatakduman_serialport_SerialPortJNI_configure(JNIEnv *env, jobject thiz, jobject fileDescriptor,
+Java_com_onatakduman_kserialport_SerialPortJNI_configure(JNIEnv *env, jobject thiz, jobject fileDescriptor,
                                                         jint baudRate, jint dataBits, jint stopBits, jint parity) {
     jclass fileDescriptorClass = env->FindClass("java/io/FileDescriptor");
     jfieldID descriptorField = env->GetFieldID(fileDescriptorClass, "descriptor", "I");

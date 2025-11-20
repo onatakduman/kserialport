@@ -29,8 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.onatakduman.kserialport.ui.theme.AndroidkserialportTheme
-import com.onatakduman.serialport.SerialPort
-import com.onatakduman.serialport.SerialPortConnection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
