@@ -6,12 +6,13 @@ plugins {
 
 android {
     namespace = "com.onatakduman.kserialport"
-    compileSdk = 35
-
+    compileSdk {
+        version = release(36)
+    }
     defaultConfig {
         applicationId = "com.onatakduman.kserialport"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
