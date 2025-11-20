@@ -56,7 +56,7 @@ publishing {
     publications {
         register<MavenPublication>("release") {
             groupId = "com.github.onatakduman"
-            artifactId = "serialport"
+            artifactId = "kserialport"
             version = "1.0.0"
 
             afterEvaluate {
