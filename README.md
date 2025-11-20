@@ -12,18 +12,22 @@ A modern, thread-safe, and reactive Android Serial Port library written in Kotli
 - **Thread Safety**: I/O operations are offloaded to `Dispatchers.IO`.
 
 ## Installation
+
 [![](https://jitpack.io/v/onatakduman/kserialport.svg)](https://jitpack.io/#onatakduman/kserialport)
 Add the Project Settings to `settings.gradle.kts`:
+
 ```kotlin
 dependencyResolutionManagement {
-		repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-		repositories {
-			mavenCentral()
-			maven { url = uri("https://jitpack.io") }
-		}
-	}
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories {
+   mavenCentral()
+   maven { url = uri("https://jitpack.io") }
+  }
+ }
 ```
+
 Add the dependency to your module's `build.gradle.kts`:
+
 ```kotlin
 dependencies {
     implementation("com.github.onatakduman:kserialport:1.0.2")
