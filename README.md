@@ -30,7 +30,7 @@ Add the dependency to your module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.onatakduman:kserialport:1.0.2")
+    implementation("com.github.onatakduman:kserialport:1.0.3")
 }
 ```
 
