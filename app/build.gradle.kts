@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.onatakduman.kserialport"
+    namespace = "com.onatakduman.kserialport.sample"
     compileSdk {
         version = release(36)
     }

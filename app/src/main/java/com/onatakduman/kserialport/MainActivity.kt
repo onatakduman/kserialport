@@ -59,8 +59,11 @@ fun SerialPortDemoPreview() {
 
 @Composable
 fun SerialPortDemo(modifier: Modifier = Modifier) {
-    var path by remember { mutableStateOf("/dev/ttyS1") }
+    var path by remember { mutableStateOf("/dev/ttyHSL0") }
     var baudRate by remember { mutableStateOf("115200") }
+    var dataBits by remember { mutableStateOf("8") }
+    var stopBits by remember { mutableStateOf("1") }
+    var parity by remember { mutableStateOf("0") }
     var connection by remember { mutableStateOf<SerialPortConnection?>(null) }
     var logs by remember { mutableStateOf(listOf<String>()) }
     var writeData by remember { mutableStateOf("Hello Serial") }
@@ -78,12 +81,35 @@ fun SerialPortDemo(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = baudRate,
-            onValueChange = { baudRate = it },
-            label = { Text("Baud Rate") },
-            modifier = Modifier.fillMaxWidth()
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = baudRate,
+                onValueChange = { baudRate = it },
+                label = { Text("Baud") },
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = dataBits,
+                onValueChange = { dataBits = it },
+                label = { Text("Data") },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = stopBits,
+                onValueChange = { stopBits = it },
+                label = { Text("Stop") },
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = parity,
+                onValueChange = { parity = it },
+                label = { Text("Parity (0=N, 1=O, 2=E)") },
+                modifier = Modifier.weight(1f)
+            )
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -91,11 +117,17 @@ fun SerialPortDemo(modifier: Modifier = Modifier) {
                 onClick = {
                     scope.launch(Dispatchers.IO) {
                         try {
-                            val port = SerialPort(path, baudRate.toInt())
+                            val port = SerialPort(
+                                path, 
+                                baudRate.toInt(),
+                                dataBits.toInt(),
+                                stopBits.toInt(),
+                                parity.toInt()
+                            )
                             val conn = port.open()
                             withContext(Dispatchers.Main) {
                                 connection = conn
-                                addLog("Opened $path at $baudRate")
+                                addLog("Opened $path at $baudRate ($dataBits/$stopBits/$parity)")
                             }
 
                             // Start reading

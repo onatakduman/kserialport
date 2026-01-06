@@ -30,7 +30,7 @@ Add the dependency to your module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.onatakduman:kserialport:1.0.3")
+    implementation("com.github.onatakduman:kserialport:1.0.4")
 }
 ```
 
@@ -48,7 +48,18 @@ val paths = finder.getAllDevicesPath() // Returns Array<String> e.g., ["/dev/tty
 
 ```kotlin
 try {
+    // 8N1 (Default)
     val serialPort = SerialPort("/dev/ttyS1", 9600)
+    
+    // Custom Configuration: 8E1 (8 Data bits, Even Parity, 1 Stop bit)
+    // val serialPort = SerialPort(
+    //     path = "/dev/ttyS1", 
+    //     baudRate = 9600,
+    //     dataBits = SerialPort.DATA_BITS_8,
+    //     stopBits = SerialPort.STOP_BITS_1,
+    //     parity = SerialPort.PARITY_EVEN
+    // )
+
     val connection = serialPort.open()
     
     // Use connection...

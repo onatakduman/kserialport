@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22.1)
 project("serialport")
 
 add_library(${CMAKE_PROJECT_NAME} SHARED
-        serialport.cpp)
+        kserialport.cpp)
 
 find_library(log-lib
         log)
