@@ -4,7 +4,7 @@ import java.io.FileDescriptor
 
 internal object SerialPortJNI {
     init {
-        System.loadLibrary("serialport")
+        System.loadLibrary("kserialport")
     }
 
     external fun open(path: String, flags: Int): FileDescriptor?

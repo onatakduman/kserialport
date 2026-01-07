@@ -67,6 +67,7 @@ fun SerialPortDemo(modifier: Modifier = Modifier) {
     var connection by remember { mutableStateOf<SerialPortConnection?>(null) }
     var logs by remember { mutableStateOf(listOf<String>()) }
     var writeData by remember { mutableStateOf("Hello Serial") }
+    var availableDevices by remember { mutableStateOf(listOf<String>()) }
     val scope = rememberCoroutineScope()
 
     fun addLog(msg: String) {
@@ -74,6 +75,49 @@ fun SerialPortDemo(modifier: Modifier = Modifier) {
     }
 
     Column(modifier = modifier.padding(16.dp)) {
+        // Scan Devices Button
+        Button(
+            onClick = {
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        val finder = SerialPortFinder()
+                        val devices = finder.getAllDevices()
+                        val paths = finder.getAllDevicesPath()
+                        withContext(Dispatchers.Main) {
+                            availableDevices = paths.toList()
+                            addLog("Found ${devices.size} device(s):")
+                            devices.forEach { addLog("  - $it") }
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            addLog("Scan error: ${e.message}")
+                        }
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Scan Devices") }
+
+        // Show available devices as clickable chips
+        if (availableDevices.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Available devices (tap to select):", style = MaterialTheme.typography.bodySmall)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                availableDevices.take(4).forEach { device ->
+                    Button(
+                        onClick = { path = device },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(device.removePrefix("/dev/"), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = path,
             onValueChange = { path = it },

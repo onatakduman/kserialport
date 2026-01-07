@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22.1)
 
-project("serialport")
+project("kserialport")
 
 add_library(${CMAKE_PROJECT_NAME} SHARED
         kserialport.cpp)
