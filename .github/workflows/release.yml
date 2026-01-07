@@ -58,7 +58,9 @@ jobs:
           java-version: '17'
 
       - name: Build with Gradle
-        run: ./gradlew kserialport:assembleRelease
+        run: |
+          chmod +x gradlew
+          ./gradlew kserialport:assembleRelease
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
