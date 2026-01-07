@@ -2,6 +2,16 @@ package com.onatakduman.kserialport
 
 import java.io.IOException
 
+/**
+ * Represents a serial port configuration.
+ *
+ * @param path The device path (e.g., "/dev/ttyUSB0")
+ * @param baudRate The baud rate (use BAUDRATE_* constants)
+ * @param dataBits Number of data bits (5, 6, 7, or 8)
+ * @param stopBits Number of stop bits (1 or 2)
+ * @param parity Parity mode (PARITY_NONE, PARITY_ODD, or PARITY_EVEN)
+ * @throws IllegalArgumentException if any parameter is invalid
+ */
 class SerialPort(
     val path: String,
     val baudRate: Int = BAUDRATE_115200,
@@ -9,6 +19,21 @@ class SerialPort(
     val stopBits: Int = STOP_BITS_1,
     val parity: Int = PARITY_NONE
 ) {
+    init {
+        require(path.isNotBlank()) { "Path cannot be blank" }
+        require(baudRate in VALID_BAUD_RATES) {
+            "Invalid baud rate: $baudRate. Valid rates: $VALID_BAUD_RATES"
+        }
+        require(dataBits in DATA_BITS_5..DATA_BITS_8) {
+            "Invalid data bits: $dataBits. Must be 5, 6, 7, or 8"
+        }
+        require(stopBits in STOP_BITS_1..STOP_BITS_2) {
+            "Invalid stop bits: $stopBits. Must be 1 or 2"
+        }
+        require(parity in PARITY_NONE..PARITY_EVEN) {
+            "Invalid parity: $parity. Must be PARITY_NONE (0), PARITY_ODD (1), or PARITY_EVEN (2)"
+        }
+    }
 
     companion object {
         const val DATA_BITS_5 = 5
@@ -54,26 +79,42 @@ class SerialPort(
         const val BAUDRATE_3000000 = 3000000
         const val BAUDRATE_3500000 = 3500000
         const val BAUDRATE_4000000 = 4000000
+
+        private val VALID_BAUD_RATES = setOf(
+            BAUDRATE_0, BAUDRATE_50, BAUDRATE_75, BAUDRATE_110, BAUDRATE_134,
+            BAUDRATE_150, BAUDRATE_200, BAUDRATE_300, BAUDRATE_600, BAUDRATE_1200,
+            BAUDRATE_1800, BAUDRATE_2400, BAUDRATE_4800, BAUDRATE_9600, BAUDRATE_19200,
+            BAUDRATE_38400, BAUDRATE_57600, BAUDRATE_115200, BAUDRATE_230400, BAUDRATE_460800,
+            BAUDRATE_500000, BAUDRATE_576000, BAUDRATE_921600, BAUDRATE_1000000, BAUDRATE_1152000,
+            BAUDRATE_1500000, BAUDRATE_2000000, BAUDRATE_2500000, BAUDRATE_3000000, BAUDRATE_3500000,
+            BAUDRATE_4000000
+        )
     }
 
+    /**
+     * Opens and configures the serial port.
+     *
+     * @return A [SerialPortConnection] for reading and writing data
+     * @throws SecurityException if permission cannot be granted
+     * @throws IOException if the port cannot be opened or configured
+     */
     fun open(): SerialPortConnection {
         if (!RootPermissionHelper.grantPermission(path)) {
             throw SecurityException(
-                    "Cannot read/write to $path. Ensure you have root access or permissions are set."
+                "Cannot read/write to $path. Ensure you have root access or permissions are set."
             )
         }
 
-        val fd =
-                SerialPortJNI.open(path, 0)
-                        ?: throw IOException("Failed to open serial port: $path")
+        val fd = SerialPortJNI.open(path, 0)
+            ?: throw IOException("Failed to open serial port: $path")
 
         if (!SerialPortJNI.configure(fd, baudRate, dataBits, stopBits, parity)) {
             try {
                 SerialPortJNI.close(fd)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore close errors during cleanup
             }
-            throw IOException("Failed to configure serial port")
+            throw IOException("Failed to configure serial port: baudRate=$baudRate, dataBits=$dataBits, stopBits=$stopBits, parity=$parity")
         }
 
         return SerialPortConnection(fd)

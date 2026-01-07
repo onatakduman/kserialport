@@ -1,5 +1,6 @@
 package com.onatakduman.kserialport
 
+import android.util.Log
 import java.io.Closeable
 import java.io.FileDescriptor
 import java.io.FileInputStream
@@ -13,15 +14,31 @@ import kotlinx.coroutines.withContext
 
 class SerialPortConnection(private val fd: FileDescriptor) : Closeable {
 
-    private val fileInputStream = FileInputStream(fd)
-    private val fileOutputStream = FileOutputStream(fd)
+    private val fileInputStream: FileInputStream
+    private val fileOutputStream: FileOutputStream
 
-    val inputStream = fileInputStream
-    val outputStream = fileOutputStream
+    init {
+        // Initialize streams with proper error handling to prevent resource leaks
+        var inputStream: FileInputStream? = null
+        try {
+            inputStream = FileInputStream(fd)
+            fileOutputStream = FileOutputStream(fd)
+            fileInputStream = inputStream
+        } catch (e: Exception) {
+            inputStream?.close()
+            throw e
+        }
+    }
+
+    val inputStream: FileInputStream get() = fileInputStream
+    val outputStream: FileOutputStream get() = fileOutputStream
 
     /**
      * A hot flow that emits data as it arrives from the serial port. This flow runs on
      * Dispatchers.IO.
+     *
+     * Note: This is a hot flow - collectors that join after data has been emitted will miss
+     * that data. Consider using SharedFlow if you need multiple collectors.
      */
     val readFlow: Flow<ByteArray> =
             flow {
@@ -31,14 +48,13 @@ class SerialPortConnection(private val fd: FileDescriptor) : Closeable {
                                 val size = fileInputStream.read(buffer)
                                 if (size > 0) {
                                     emit(buffer.copyOf(size))
-                                } else if (size < 0) {
-                                    break // End of stream
+                                } else {
+                                    // size <= 0 means EOF or error, exit the loop
+                                    break
                                 }
                             }
                         } catch (e: IOException) {
-                            // Handle or rethrow, depending on desired behavior.
-                            // For a flow, usually we let the collector handle exceptions or use
-                            // catch operator.
+                            // Rethrow to let collectors handle via catch operator
                             throw e
                         }
                     }
@@ -57,10 +73,22 @@ class SerialPortConnection(private val fd: FileDescriptor) : Closeable {
     override fun close() {
         try {
             fileInputStream.close()
-            fileOutputStream.close()
-            SerialPortJNI.close(fd)
         } catch (e: IOException) {
-            e.printStackTrace()
+            Log.w(TAG, "Error closing input stream", e)
         }
+        try {
+            fileOutputStream.close()
+        } catch (e: IOException) {
+            Log.w(TAG, "Error closing output stream", e)
+        }
+        try {
+            SerialPortJNI.close(fd)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error closing file descriptor", e)
+        }
+    }
+
+    companion object {
+        private const val TAG = "SerialPortConnection"
     }
 }

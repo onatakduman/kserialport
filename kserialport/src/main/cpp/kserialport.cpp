@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <android/log.h>
+#include <cerrno>
+#include <cstring>
 
 #define TAG "SerialPortJNI"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
@@ -15,38 +17,89 @@ extern "C" {
 
 JNIEXPORT jobject JNICALL
 Java_com_onatakduman_kserialport_SerialPortJNI_open(JNIEnv *env, jobject thiz, jstring path, jint flags) {
-    const char *path_utf = env->GetStringUTFChars(path, 0);
+    if (path == nullptr) {
+        LOGE("Path is null");
+        return nullptr;
+    }
+
+    const char *path_utf = env->GetStringUTFChars(path, nullptr);
     if (path_utf == nullptr) {
+        LOGE("Failed to get path string");
         return nullptr;
     }
 
     LOGD("Opening serial port: %s with flags: %d", path_utf, flags);
-    int fd = open(path_utf, O_RDWR | flags);
+    int fd = open(path_utf, O_RDWR | O_NOCTTY | O_NONBLOCK | flags);
     env->ReleaseStringUTFChars(path, path_utf);
 
     if (fd == -1) {
-        LOGE("Cannot open port");
+        LOGE("Cannot open port: %s", strerror(errno));
         return nullptr;
     }
 
-    jclass fileDescriptorClass = env->FindClass("java/io/FileDescriptor");
-    jmethodID fileDescriptorConstructor = env->GetMethodID(fileDescriptorClass, "<init>", "()V");
-    jobject fileDescriptor = env->NewObject(fileDescriptorClass, fileDescriptorConstructor);
-    jfieldID descriptorField = env->GetFieldID(fileDescriptorClass, "descriptor", "I");
-    env->SetIntField(fileDescriptor, descriptorField, fd);
+    // Clear non-blocking flag after open (used only to prevent blocking on open)
+    int currentFlags = fcntl(fd, F_GETFL);
+    if (currentFlags != -1) {
+        fcntl(fd, F_SETFL, currentFlags & ~O_NONBLOCK);
+    }
 
+    jclass fileDescriptorClass = env->FindClass("java/io/FileDescriptor");
+    if (fileDescriptorClass == nullptr) {
+        LOGE("Cannot find FileDescriptor class");
+        close(fd);
+        return nullptr;
+    }
+
+    jmethodID fileDescriptorConstructor = env->GetMethodID(fileDescriptorClass, "<init>", "()V");
+    if (fileDescriptorConstructor == nullptr) {
+        LOGE("Cannot find FileDescriptor constructor");
+        close(fd);
+        return nullptr;
+    }
+
+    jobject fileDescriptor = env->NewObject(fileDescriptorClass, fileDescriptorConstructor);
+    if (fileDescriptor == nullptr) {
+        LOGE("Cannot create FileDescriptor object");
+        close(fd);
+        return nullptr;
+    }
+
+    jfieldID descriptorField = env->GetFieldID(fileDescriptorClass, "descriptor", "I");
+    if (descriptorField == nullptr) {
+        LOGE("Cannot find descriptor field");
+        close(fd);
+        return nullptr;
+    }
+
+    env->SetIntField(fileDescriptor, descriptorField, fd);
     return fileDescriptor;
 }
 
 JNIEXPORT void JNICALL
 Java_com_onatakduman_kserialport_SerialPortJNI_close(JNIEnv *env, jobject thiz, jobject fileDescriptor) {
-    jclass fileDescriptorClass = env->FindClass("java/io/FileDescriptor");
-    jfieldID descriptorField = env->GetFieldID(fileDescriptorClass, "descriptor", "I");
-    int fd = env->GetIntField(fileDescriptor, descriptorField);
+    if (fileDescriptor == nullptr) {
+        LOGE("FileDescriptor is null");
+        return;
+    }
 
+    jclass fileDescriptorClass = env->FindClass("java/io/FileDescriptor");
+    if (fileDescriptorClass == nullptr) {
+        LOGE("Cannot find FileDescriptor class");
+        return;
+    }
+
+    jfieldID descriptorField = env->GetFieldID(fileDescriptorClass, "descriptor", "I");
+    if (descriptorField == nullptr) {
+        LOGE("Cannot find descriptor field");
+        return;
+    }
+
+    int fd = env->GetIntField(fileDescriptor, descriptorField);
     if (fd != -1) {
         LOGD("Closing serial port: %d", fd);
-        close(fd);
+        if (close(fd) == -1) {
+            LOGE("Error closing fd %d: %s", fd, strerror(errno));
+        }
         env->SetIntField(fileDescriptor, descriptorField, -1);
     }
 }
@@ -91,25 +144,45 @@ static speed_t getBaudRate(jint baudRate) {
 JNIEXPORT jboolean JNICALL
 Java_com_onatakduman_kserialport_SerialPortJNI_configure(JNIEnv *env, jobject thiz, jobject fileDescriptor,
                                                         jint baudRate, jint dataBits, jint stopBits, jint parity) {
+    if (fileDescriptor == nullptr) {
+        LOGE("FileDescriptor is null");
+        return JNI_FALSE;
+    }
+
     jclass fileDescriptorClass = env->FindClass("java/io/FileDescriptor");
+    if (fileDescriptorClass == nullptr) {
+        LOGE("Cannot find FileDescriptor class");
+        return JNI_FALSE;
+    }
+
     jfieldID descriptorField = env->GetFieldID(fileDescriptorClass, "descriptor", "I");
+    if (descriptorField == nullptr) {
+        LOGE("Cannot find descriptor field");
+        return JNI_FALSE;
+    }
+
     int fd = env->GetIntField(fileDescriptor, descriptorField);
+    if (fd < 0) {
+        LOGE("Invalid file descriptor: %d", fd);
+        return JNI_FALSE;
+    }
 
     struct termios cfg;
-    if (tcgetattr(fd, &cfg)) {
-        LOGE("tcgetattr() failed");
+    if (tcgetattr(fd, &cfg) == -1) {
+        LOGE("tcgetattr() failed: %s", strerror(errno));
         return JNI_FALSE;
     }
 
     cfmakeraw(&cfg);
     speed_t speed = getBaudRate(baudRate);
-    if (speed == -1) {
-        LOGE("Invalid baud rate");
+    if (speed == (speed_t)-1) {
+        LOGE("Invalid baud rate: %d", baudRate);
         return JNI_FALSE;
     }
     cfsetispeed(&cfg, speed);
     cfsetospeed(&cfg, speed);
 
+    // Data bits
     cfg.c_cflag &= ~CSIZE;
     switch (dataBits) {
         case 5: cfg.c_cflag |= CS5; break;
@@ -119,6 +192,7 @@ Java_com_onatakduman_kserialport_SerialPortJNI_configure(JNIEnv *env, jobject th
         default: cfg.c_cflag |= CS8; break;
     }
 
+    // Parity
     switch (parity) {
         case 0: cfg.c_cflag &= ~PARENB; break; // None
         case 1: cfg.c_cflag |= (PARODD | PARENB); break; // Odd
@@ -126,16 +200,27 @@ Java_com_onatakduman_kserialport_SerialPortJNI_configure(JNIEnv *env, jobject th
         default: cfg.c_cflag &= ~PARENB; break;
     }
 
+    // Stop bits
     switch (stopBits) {
         case 1: cfg.c_cflag &= ~CSTOPB; break;
         case 2: cfg.c_cflag |= CSTOPB; break;
         default: cfg.c_cflag &= ~CSTOPB; break;
     }
 
-    if (tcsetattr(fd, TCSANOW, &cfg)) {
-        LOGE("tcsetattr() failed");
+    // Enable receiver and ignore modem control lines
+    cfg.c_cflag |= (CLOCAL | CREAD);
+
+    // Configure read timeout: VMIN=1, VTIME=1 (100ms timeout after first byte)
+    cfg.c_cc[VMIN] = 1;
+    cfg.c_cc[VTIME] = 1;
+
+    if (tcsetattr(fd, TCSANOW, &cfg) == -1) {
+        LOGE("tcsetattr() failed: %s", strerror(errno));
         return JNI_FALSE;
     }
+
+    // Flush any pending data
+    tcflush(fd, TCIOFLUSH);
 
     return JNI_TRUE;
 }
