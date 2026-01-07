@@ -55,5 +55,5 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.set_version.outputs.version }}
-          name: Release ${{ steps.set_version.outputs.version }}
+          name: ${{ steps.set_version.outputs.version }}
           generate_release_notes: true
