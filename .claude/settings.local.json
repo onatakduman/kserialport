@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(cat:*)",
-      "Bash(./gradlew clean:*)"
+      "Bash(./gradlew clean:*)",
+      "Bash(./gradlew assembleDebug:*)"
     ]
   }
 }
