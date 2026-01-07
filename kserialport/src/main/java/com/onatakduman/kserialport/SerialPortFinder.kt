@@ -32,20 +32,32 @@ class SerialPortFinder {
 
     fun getDrivers(): Vector<Driver> {
         if (mDrivers.isEmpty()) {
-            val r = LineNumberReader(FileReader("/proc/tty/drivers"))
-            var l: String?
-            while (r.readLine().also { l = it } != null) {
-                // Issue 3:
-                // Since driver name may contain spaces, we do not extract driver name with split()
-                val line = l ?: continue
-                val driverName = line.substring(0, 0x15).trim { it <= ' ' }
-                val w = line.split(" +".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-                if (w.size >= 5 && w[w.size - 1] == "serial") {
-                    Log.d(TAG, "Found new driver " + driverName + " on " + w[w.size - 4])
-                    mDrivers.add(Driver(driverName, w[w.size - 4]))
+            try {
+                val r = LineNumberReader(FileReader("/proc/tty/drivers"))
+                var l: String?
+                while (r.readLine().also { l = it } != null) {
+                    // Issue 3:
+                    // Since driver name may contain spaces, we do not extract driver name with split()
+                    val line = l ?: continue
+                    val driverName = line.substring(0, 0x15).trim { it <= ' ' }
+                    val w = line.split(" +".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+                    if (w.size >= 5 && w[w.size - 1] == "serial") {
+                        Log.d(TAG, "Found new driver " + driverName + " on " + w[w.size - 4])
+                        mDrivers.add(Driver(driverName, w[w.size - 4]))
+                    }
                 }
+                r.close()
+            } catch (e: Exception) {
+                Log.w(TAG, "Unable to read /proc/tty/drivers: " + e.message + ". fallback to common drivers")
+                mDrivers.add(Driver("Serial", "/dev/ttyS"))
+                mDrivers.add(Driver("USB", "/dev/ttyUSB"))
+                mDrivers.add(Driver("ACM", "/dev/ttyACM"))
+                mDrivers.add(Driver("AMA", "/dev/ttyAMA"))
+                mDrivers.add(Driver("MXC", "/dev/ttymxc"))
+                mDrivers.add(Driver("HS", "/dev/ttyHS"))
+                mDrivers.add(Driver("SAC", "/dev/ttySAC"))
             }
-            r.close()
+
         }
         return mDrivers
     }
