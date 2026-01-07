@@ -1,0 +1,59 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version Bump Type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Get Latest Tag
+        id: previoustag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          fallback: 1.0.0
+
+      - name: Calculate New Version
+        id: semvers
+        uses: "wyrihaximus/github-action-next-semvers@v1"
+        with:
+          version: ${{ steps.previoustag.outputs.tag }}
+
+      - name: Set Release Version
+        id: set_version
+        run: |
+          if [ "${{ inputs.version_bump }}" == "major" ]; then
+            echo "version=${{ steps.semvers.outputs.major }}" >> $GITHUB_OUTPUT
+          elif [ "${{ inputs.version_bump }}" == "minor" ]; then
+            echo "version=${{ steps.semvers.outputs.minor }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ steps.semvers.outputs.patch }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.set_version.outputs.version }}
+          name: Release ${{ steps.set_version.outputs.version }}
+          generate_release_notes: true

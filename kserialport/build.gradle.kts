@@ -57,7 +57,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "com.github.onatakduman"
             artifactId = "kserialport"
-            version = "1.0.6"
+            version = project.version.toString()
 
             afterEvaluate {
                 from(components["release"])
