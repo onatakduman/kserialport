@@ -10,3 +10,6 @@ find_library(log-lib
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
         ${log-lib})
+
+# Ensure 16 KB page alignment for Android 15+ compatibility
+target_link_options(${CMAKE_PROJECT_NAME} PRIVATE "-Wl,-z,max-page-size=16384")
