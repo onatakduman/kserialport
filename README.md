@@ -2,11 +2,14 @@
 
 A modern, thread-safe, and reactive Android Serial Port library written in Kotlin. This library is a modernization of the popular `xmaihh/Android-Serialport` library, leveraging Kotlin Coroutines and Flow for asynchronous data handling.
 
-## Features
-
 - **Modern Stack**: 100% Kotlin, Coroutines, and Flow.
 - **Reactive API**: Read data as a hot `Flow<ByteArray>`.
-- **Packet Handling**: Built-in support for "sticky packets" (fragmentation) using `delimiter` and `fixedLength` operators.
+- **Packet Handling**: Built-in support for "sticky packets" with multiple parsing strategies:
+  - `delimiter()` - Split by delimiter bytes (e.g., newline)
+  - `fixedLength()` - Split into fixed-size chunks
+  - `startEndMarker()` - Extract packets framed by start/end sequences
+  - `lengthPrefixed()` - Parse packets with length headers
+  - `customParser()` - Implement your own parsing logic
 - **Device Discovery**: `SerialPortFinder` to list available serial ports on the device.
 - **Root Support**: Helper to request root permissions for accessing serial ports.
 - **Thread Safety**: I/O operations are offloaded to `Dispatchers.IO`.
@@ -30,7 +33,7 @@ Add the dependency to your module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.onatakduman:kserialport:1.0.5")
+    implementation("com.github.onatakduman:kserialport:1.0.6")
 }
 ```
 
@@ -75,24 +78,108 @@ try {
 Use the `readFlow` to receive data. You can apply packet handling operators directly.
 
 ```kotlin
-// Simple read
+// Simple read - get raw bytes as they arrive
 lifecycleScope.launch {
     connection.readFlow.collect { bytes ->
         Log.d("Serial", "Received: ${bytes.toHexString()}")
     }
 }
-
-// Handle Sticky Packets (Split by Newline)
-lifecycleScope.launch {
-    connection.readFlow
-        .delimiter(byteArrayOf(0x0A)) // Split by \n
-        .collect { packet ->
-            Log.d("Serial", "Packet: ${String(packet)}")
-        }
-}
 ```
 
-### 4. Write Data
+### 4. Packet Parsing (Sticky Packet Handling)
+
+Serial data often arrives fragmented or concatenated. Use these operators to extract complete packets:
+
+#### Delimiter-Based
+
+Split packets by a delimiter sequence (e.g., newline, CRLF):
+
+```kotlin
+connection.readFlow
+    .delimiter(byteArrayOf(0x0A)) // Split by \n
+    .collect { packet ->
+        Log.d("Serial", "Line: ${String(packet)}")
+    }
+```
+
+#### Fixed-Length Packets
+
+When packets always have the same size:
+
+```kotlin
+connection.readFlow
+    .fixedLength(32) // 32-byte packets
+    .collect { packet ->
+        // Process 32-byte packet
+    }
+```
+
+#### Start/End Marker Frames
+
+For protocols that frame data with markers (e.g., STX/ETX):
+
+```kotlin
+val STX = byteArrayOf(0x02)
+val ETX = byteArrayOf(0x03)
+
+connection.readFlow
+    .startEndMarker(startMarker = STX, endMarker = ETX)
+    .collect { packet ->
+        // Packet data between STX and ETX
+    }
+```
+
+#### Length-Prefixed Packets
+
+Common in binary protocols where a header contains the payload length:
+
+```kotlin
+// Protocol: [1-byte length][payload]
+connection.readFlow
+    .lengthPrefixed(
+        lengthFieldOffset = 0,    // Length at byte 0
+        lengthFieldSize = 1,      // 1-byte length field
+        bigEndian = true
+    )
+    .collect { packet ->
+        // Complete packet including header
+    }
+
+// More complex: [2-byte header][2-byte length BE][payload]
+connection.readFlow
+    .lengthPrefixed(
+        lengthFieldOffset = 2,    // Length field starts at byte 2
+        lengthFieldSize = 2,      // 2-byte length (big-endian)
+        headerSize = 4,           // Total header is 4 bytes
+        bigEndian = true
+    )
+    .collect { packet -> }
+```
+
+#### Custom Parser
+
+For complex protocols, implement your own logic:
+
+```kotlin
+connection.readFlow
+    .customParser { buffer ->
+        // Return null if no complete packet yet
+        if (buffer.size < 4) return@customParser null
+        
+        // Parse your protocol...
+        val packetEnd = findPacketEnd(buffer)
+        if (packetEnd == -1) return@customParser null
+        
+        // Return the packet and remaining bytes
+        PacketParser.ParseResult(
+            packet = buffer.copyOfRange(0, packetEnd),
+            remaining = buffer.copyOfRange(packetEnd, buffer.size)
+        )
+    }
+    .collect { packet -> }
+```
+
+### 5. Write Data
 
 ```kotlin
 lifecycleScope.launch {
@@ -101,7 +188,7 @@ lifecycleScope.launch {
 }
 ```
 
-### 5. Close Connection
+### 6. Close Connection
 
 ```kotlin
 connection.close()
