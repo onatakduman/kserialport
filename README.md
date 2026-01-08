@@ -16,26 +16,38 @@ A modern, thread-safe, and reactive Android Serial Port library written in Kotli
 
 ## Installation
 
-[![](https://jitpack.io/v/onatakduman/kserialport.svg)](https://jitpack.io/#onatakduman/kserialport)
-[![](https://img.shields.io/github/license/onatakduman/kserialport.svg)](https://github.com/onatakduman/kserialport)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.onatakduman/kserialport)](https://central.sonatype.com/artifact/io.github.onatakduman/kserialport)
+[![JitPack](https://jitpack.io/v/onatakduman/kserialport.svg)](https://jitpack.io/#onatakduman/kserialport)
+[![License](https://img.shields.io/github/license/onatakduman/kserialport.svg)](https://github.com/onatakduman/kserialport)
 
-Add the Project Settings to `settings.gradle.kts`:
-
-```kotlin
-dependencyResolutionManagement {
-  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-  repositories {
-   mavenCentral()
-   maven { url = uri("https://jitpack.io") }
-  }
- }
-```
+### Option 1: Maven Central (Recommended)
 
 Add the dependency to your module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.onatakduman:kserialport:1.0.6")
+    implementation("io.github.onatakduman:kserialport:1.1.3")
+}
+```
+
+### Option 2: JitPack
+
+Add JitPack repository to `settings.gradle.kts`:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+```
+
+Add the dependency:
+
+```kotlin
+dependencies {
+    implementation("com.github.onatakduman:kserialport:1.1.3")
 }
 ```
 

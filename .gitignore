@@ -36,3 +36,9 @@ captures/
 *.keystore
 *.key
 /.idea/
+
+# Secrets - DO NOT COMMIT
+gpg-key.asc
+gpg-key2.asc
+*.gpg
+*.kbx

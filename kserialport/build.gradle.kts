@@ -1,14 +1,12 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    `maven-publish`
+    alias(libs.plugins.maven.publish)
 }
 
 android {
     namespace = "com.onatakduman.kserialport"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26
@@ -44,24 +42,44 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-            withJavadocJar()
-        }
-    }
 }
 
-publishing {
-    publications {
-        register<MavenPublication>("release") {
-            groupId = "com.github.onatakduman"
-            artifactId = "kserialport"
-            version = project.version.toString()
+// Vanniktech Maven Publish configuration
+mavenPublishing {
+    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
 
-            afterEvaluate {
-                from(components["release"])
+    coordinates(
+        project.findProperty("GROUP").toString(),
+        "kserialport",
+        project.findProperty("VERSION_NAME").toString()
+    )
+
+    pom {
+        name.set("KSerialPort")
+        description.set("A modern, thread-safe, and reactive Android Serial Port library written in Kotlin")
+        url.set("https://github.com/onatakduman/android-k-serialport")
+        inceptionYear.set("2024")
+
+        licenses {
+            license {
+                name.set("The Apache License, Version 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
             }
+        }
+
+        developers {
+            developer {
+                id.set("onatakduman")
+                name.set("Onat Akduman")
+                email.set("onatakduman@gmail.com")
+            }
+        }
+
+        scm {
+            connection.set("scm:git:git://github.com/onatakduman/android-k-serialport.git")
+            developerConnection.set("scm:git:ssh://github.com:onatakduman/android-k-serialport.git")
+            url.set("https://github.com/onatakduman/android-k-serialport")
         }
     }
 }
