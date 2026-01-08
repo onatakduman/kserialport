@@ -115,6 +115,8 @@ jobs:
           generate_release_notes: true
           files: |
             kserialport/build/outputs/aar/*.aar
+            kserialport/build/libs/*.jar
+            kserialport/build/publications/maven/pom-default.xml
 
       # Commit updated version
       - name: Commit Version Update
