@@ -42,3 +42,5 @@ gpg-key.asc
 gpg-key2.asc
 *.gpg
 *.kbx
+gradle.maven.properties
+gradle.properties.template
