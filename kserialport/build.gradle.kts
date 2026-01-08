@@ -47,7 +47,11 @@ android {
 // Vanniktech Maven Publish configuration
 mavenPublishing {
     publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
-    signAllPublications()
+
+    // Only sign publications when not on JitPack (JitPack doesn't have GPG keys)
+    if (System.getenv("JITPACK") == null) {
+        signAllPublications()
+    }
 
     coordinates(
         project.findProperty("GROUP").toString(),
