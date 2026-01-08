@@ -5,6 +5,7 @@ import java.io.Closeable
 import java.io.FileDescriptor
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InterruptedIOException
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -53,6 +54,9 @@ class SerialPortConnection(private val fd: FileDescriptor) : Closeable {
                                     break
                                 }
                             }
+                        } catch (e: InterruptedIOException) {
+                            // Coroutine was cancelled, end the flow gracefully
+                            Log.d(TAG, "Read flow interrupted (coroutine cancelled)")
                         } catch (e: IOException) {
                             // Rethrow to let collectors handle via catch operator
                             throw e
