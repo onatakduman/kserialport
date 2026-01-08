@@ -76,22 +76,24 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Import GPG key and create secring for file-based signing
-      - name: Import GPG Key
+      # Prepare GPG key for in-memory signing
+      - name: Prepare GPG Key for Signing
         if: inputs.publish_to == 'maven_central' || inputs.publish_to == 'both'
+        id: gpg_key
         run: |
-          echo "${{ secrets.GPG_SIGNING_KEY }}" | gpg --batch --import
-          gpg --list-secret-keys --keyid-format=long
-          # Export to secring.gpg for Gradle signing plugin
-          gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_SIGNING_PASSWORD }}" --export-secret-keys > ~/.gnupg/secring.gpg
-          echo "GPG key imported successfully"
+          # Convert multi-line GPG key to escaped newlines for Gradle in-memory signing
+          GPG_KEY_FORMATTED=$(echo "${{ secrets.GPG_SIGNING_KEY }}" | awk '{printf "%s\\n", $0}')
+          echo "gpg_key_escaped<<EOF" >> $GITHUB_OUTPUT
+          echo "$GPG_KEY_FORMATTED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "GPG key prepared for in-memory signing"
 
       - name: Build with Gradle
         run: |
           chmod +x gradlew
           ./gradlew kserialport:assembleRelease -PVERSION_NAME=${{ steps.set_version.outputs.version }}
 
-      # Publish to Maven Central using Vanniktech plugin with file-based signing
+      # Publish to Maven Central using Vanniktech plugin with in-memory signing
       - name: Publish to Maven Central
         if: inputs.publish_to == 'maven_central' || inputs.publish_to == 'both'
         run: |
@@ -99,9 +101,9 @@ jobs:
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          ORG_GRADLE_PROJECT_signing.keyId: ${{ secrets.GPG_SIGNING_KEY_ID }}
-          ORG_GRADLE_PROJECT_signing.password: ${{ secrets.GPG_SIGNING_PASSWORD }}
-          ORG_GRADLE_PROJECT_signing.secretKeyRingFile: /home/runner/.gnupg/secring.gpg
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.GPG_SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ steps.gpg_key.outputs.gpg_key_escaped }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       # Create GitHub Release with tag (for JitPack - uses same version)
       - name: Create GitHub Release
