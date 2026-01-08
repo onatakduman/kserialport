@@ -17,6 +17,8 @@ A modern, thread-safe, and reactive Android Serial Port library written in Kotli
 ## Installation
 
 [![](https://jitpack.io/v/onatakduman/kserialport.svg)](https://jitpack.io/#onatakduman/kserialport)
+[![](https://img.shields.io/github/license/onatakduman/kserialport.svg)](https://github.com/onatakduman/kserialport)
+
 Add the Project Settings to `settings.gradle.kts`:
 
 ```kotlin
