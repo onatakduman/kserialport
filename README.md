@@ -1,6 +1,6 @@
 # Android Serial Port (Kotlin)
 
-A modern, thread-safe, and reactive Android Serial Port library written in Kotlin. This library is a modernization of the popular `[xmaihh/Android-Serialport](https://github.com/xmaihh/Android-Serialport)` library, leveraging Kotlin Coroutines and Flow for asynchronous data handling.
+A modern, thread-safe, and reactive Android Serial Port library written in Kotlin. This library is a modernization of the popular [xmaihh/Android-Serialport](https://github.com/xmaihh/Android-Serialport) library, leveraging Kotlin Coroutines and Flow for asynchronous data handling.
 
 - **Modern Stack**: 100% Kotlin, Coroutines, and Flow.
 - **Reactive API**: Read data as a hot `Flow<ByteArray>`.
