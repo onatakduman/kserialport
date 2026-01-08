@@ -76,6 +76,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Decode base64 GPG key
+      - name: Decode GPG Key
+        if: inputs.publish_to == 'maven_central' || inputs.publish_to == 'both'
+        run: |
+          echo "${{ secrets.GPG_SIGNING_KEY }}" | base64 --decode > /tmp/secring.gpg
+          echo "GPG key decoded successfully"
+
       - name: Build with Gradle
         run: |
           chmod +x gradlew
@@ -85,6 +92,8 @@ jobs:
       - name: Publish to Maven Central
         if: inputs.publish_to == 'maven_central' || inputs.publish_to == 'both'
         run: |
+          # Read the decoded GPG key as ASCII armor
+          GPG_KEY=$(cat /tmp/secring.gpg)
           ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache -PVERSION_NAME=${{ steps.set_version.outputs.version }}
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
