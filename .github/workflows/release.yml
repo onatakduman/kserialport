@@ -93,17 +93,20 @@ jobs:
           ./gradlew kserialport:assembleRelease -PVERSION_NAME=${{ steps.set_version.outputs.version }}
 
       # Publish to Maven Central using Vanniktech plugin
-      # Using file-based signing and command-line properties to avoid environment variable issues
+      # Pass properties safely via environment variables mapped to -P flags
       - name: Publish to Maven Central
         if: inputs.publish_to == 'maven_central' || inputs.publish_to == 'both'
+        env:
+          SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
         run: |
           ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache \
             -PVERSION_NAME=${{ steps.set_version.outputs.version }} \
             -Psigning.keyId=${{ secrets.GPG_SIGNING_KEY_ID }} \
-            -Psigning.password='${{ secrets.GPG_SIGNING_PASSWORD }}' \
+            -Psigning.password="$SIGNING_PASSWORD" \
             -Psigning.secretKeyRingFile=/home/runner/.gnupg/secring.gpg \
             -PmavenCentralUsername=${{ secrets.MAVEN_CENTRAL_USERNAME }} \
-            -PmavenCentralPassword=${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+            -PmavenCentralPassword="$MAVEN_CENTRAL_PASSWORD"
 
       # Create GitHub Release with tag (for JitPack - uses same version)
       - name: Create GitHub Release
