@@ -15,7 +15,7 @@ on:
       publish_to:
         description: 'Publish Target'
         required: true
-        default: 'github'
+        default: 'both'
         type: choice
         options:
         - github
@@ -60,6 +60,13 @@ jobs:
             echo "version=${{ steps.semvers.outputs.patch }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Update Version in gradle.properties
+        run: |
+          VERSION="${{ steps.set_version.outputs.version }}"
+          echo "Updating VERSION_NAME to $VERSION"
+          sed -i "s/VERSION_NAME=.*/VERSION_NAME=$VERSION/" gradle.properties
+          cat gradle.properties
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -72,13 +79,13 @@ jobs:
       - name: Build with Gradle
         run: |
           chmod +x gradlew
-          ./gradlew kserialport:assembleRelease
+          ./gradlew kserialport:assembleRelease -PVERSION_NAME=${{ steps.set_version.outputs.version }}
 
       # Publish to Maven Central using Vanniktech plugin
       - name: Publish to Maven Central
         if: inputs.publish_to == 'maven_central' || inputs.publish_to == 'both'
         run: |
-          ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache
+          ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache -PVERSION_NAME=${{ steps.set_version.outputs.version }}
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -86,13 +93,21 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
-      # Create GitHub Release (for JitPack compatibility)
+      # Create GitHub Release with tag (for JitPack - uses same version)
       - name: Create GitHub Release
         if: inputs.publish_to == 'github' || inputs.publish_to == 'both'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.set_version.outputs.version }}
-          name: ${{ steps.set_version.outputs.version }}
+          name: Release ${{ steps.set_version.outputs.version }}
           generate_release_notes: true
           files: |
             kserialport/build/outputs/aar/*.aar
+
+      # Commit updated version (optional - keeps gradle.properties in sync)
+      - name: Commit Version Update
+        if: inputs.publish_to == 'maven_central' || inputs.publish_to == 'both'
+        run: |
+          git add gradle.properties
+          git commit -m "chore: Bump version to ${{ steps.set_version.outputs.version }}" || echo "No changes to commit"
+          git push origin main || echo "Nothing to push"
