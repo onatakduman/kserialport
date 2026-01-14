@@ -35,6 +35,12 @@ class SerialPortConnection(private val fd: FileDescriptor) : Closeable {
     val outputStream: FileOutputStream get() = fileOutputStream
 
     /**
+     * Controls the logging format for data (HEX, BINARY, ASCII).
+     * Default is [DataLogger.Format.HEX].
+     */
+    var logFormat: DataLogger.Format = DataLogger.Format.HEX
+
+    /**
      * A hot flow that emits data as it arrives from the serial port. This flow runs on
      * Dispatchers.IO.
      *
@@ -48,7 +54,9 @@ class SerialPortConnection(private val fd: FileDescriptor) : Closeable {
                             while (true) {
                                 val size = fileInputStream.read(buffer)
                                 if (size > 0) {
-                                    emit(buffer.copyOf(size))
+                                    val data = buffer.copyOf(size)
+                                    DataLogger.log("SerialPort (RX)", data, logFormat)
+                                    emit(data)
                                 } else {
                                     // size <= 0 means EOF or error, exit the loop
                                     break
@@ -70,6 +78,7 @@ class SerialPortConnection(private val fd: FileDescriptor) : Closeable {
      */
     suspend fun write(data: ByteArray) =
             withContext(Dispatchers.IO) {
+                DataLogger.log("SerialPort (TX)", data, logFormat)
                 fileOutputStream.write(data)
                 fileOutputStream.flush()
             }
