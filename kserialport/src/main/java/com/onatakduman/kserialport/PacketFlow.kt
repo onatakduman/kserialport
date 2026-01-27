@@ -380,3 +380,286 @@ private fun readLength(bytes: ByteArray, bigEndian: Boolean): Int {
         else -> throw IllegalArgumentException("Unsupported length field size: ${bytes.size}")
     }
 }
+
+/**
+ * Callback interface for packet flow logging.
+ * Implement this to receive notifications about raw data and parsed frames.
+ */
+interface PacketFlowLogger {
+    /**
+     * Called when raw data is received from the stream.
+     * @param data The raw bytes received
+     * @param bufferSize Current buffer size after adding this data
+     */
+    fun onRawData(data: ByteArray, bufferSize: Int) {}
+
+    /**
+     * Called when buffer content changes (for debugging).
+     * @param buffer Current buffer content as hex string
+     */
+    fun onBufferUpdate(buffer: String) {}
+
+    /**
+     * Called when a complete frame is extracted.
+     * @param frame The extracted frame bytes
+     * @param frameNumber Sequential frame number
+     */
+    fun onFrameExtracted(frame: ByteArray, frameNumber: Int) {}
+
+    /**
+     * Called when data is discarded (before preamble or invalid).
+     * @param discarded The discarded bytes
+     * @param reason Reason for discarding
+     */
+    fun onDataDiscarded(discarded: ByteArray, reason: String) {}
+}
+
+/**
+ * Splits the flow of byte arrays into fixed-length packets based on a preamble marker.
+ * Searches for the preamble, then extracts exactly [frameLength] bytes starting from the preamble.
+ *
+ * This is ideal for binary protocols where:
+ * - Packets start with a known preamble/header (e.g., 0xAA 0x55, or "$CMD")
+ * - Packets have a fixed length
+ *
+ * @param preamble The byte sequence that marks the start of a packet
+ * @param frameLength Total frame length including the preamble
+ * @param logger Optional logger for debugging raw data and frames
+ * @param maxBufferSize Maximum buffer size before throwing BufferOverflowException (default 1MB)
+ * @throws BufferOverflowException if buffer exceeds maxBufferSize without finding valid frame
+ *
+ * Example usage:
+ * ```kotlin
+ * // Custom protocol with 0xAA 0x55 preamble, 64-byte frames
+ * connection.readFlow
+ *     .preambleAndFixedLength(
+ *         preamble = byteArrayOf(0xAA.toByte(), 0x55),
+ *         frameLength = 64,
+ *         logger = object : PacketFlowLogger {
+ *             override fun onRawData(data: ByteArray, bufferSize: Int) {
+ *                 Log.d("Protocol", "RAW: ${data.toHexString()} (buffer: $bufferSize)")
+ *             }
+ *             override fun onFrameExtracted(frame: ByteArray, frameNumber: Int) {
+ *                 Log.d("Protocol", "FRAME #$frameNumber: ${frame.toHexString()}")
+ *             }
+ *             override fun onDataDiscarded(discarded: ByteArray, reason: String) {
+ *                 Log.w("Protocol", "Discarded: $reason")
+ *             }
+ *         }
+ *     )
+ *     .collect { frame ->
+ *         // Process complete frame
+ *     }
+ * ```
+ */
+fun Flow<ByteArray>.preambleAndFixedLength(
+    preamble: ByteArray,
+    frameLength: Int,
+    logger: PacketFlowLogger? = null,
+    maxBufferSize: Int = DEFAULT_MAX_BUFFER_SIZE
+): Flow<ByteArray> = flow {
+    require(preamble.isNotEmpty()) { "Preamble cannot be empty" }
+    require(frameLength > preamble.size) { "frameLength must be > preamble size" }
+    require(maxBufferSize >= frameLength) { "maxBufferSize must be >= frameLength" }
+
+    val buffer = ByteArrayOutputStream()
+    var frameNumber = 0
+
+    collect { chunk ->
+        // Log raw incoming data
+        logger?.onRawData(chunk, buffer.size() + chunk.size)
+
+        buffer.write(chunk)
+
+        // Log buffer update
+        logger?.onBufferUpdate(buffer.toByteArray().toHexString())
+
+        // Check buffer size limit
+        if (buffer.size() > maxBufferSize) {
+            throw BufferOverflowException(
+                "Buffer size ${buffer.size()} exceeded maximum $maxBufferSize bytes"
+            )
+        }
+
+        // Process all complete frames in buffer
+        while (buffer.size() >= frameLength) {
+            val currentBytes = buffer.toByteArray()
+            val preambleIndex = findDelimiter(currentBytes, preamble)
+
+            if (preambleIndex == -1) {
+                // No preamble found, discard all but last (preamble.size - 1) bytes
+                // to handle partial preamble at end
+                val keepSize = (preamble.size - 1).coerceAtMost(currentBytes.size)
+                val discarded = currentBytes.copyOfRange(0, currentBytes.size - keepSize)
+                if (discarded.isNotEmpty()) {
+                    logger?.onDataDiscarded(discarded, "No preamble found")
+                }
+                buffer.reset()
+                if (keepSize > 0) {
+                    buffer.write(currentBytes.copyOfRange(currentBytes.size - keepSize, currentBytes.size))
+                }
+                break
+            }
+
+            // Discard data before preamble
+            if (preambleIndex > 0) {
+                val discarded = currentBytes.copyOfRange(0, preambleIndex)
+                logger?.onDataDiscarded(discarded, "Data before preamble")
+                val remaining = currentBytes.copyOfRange(preambleIndex, currentBytes.size)
+                buffer.reset()
+                buffer.write(remaining)
+                continue
+            }
+
+            // Check if we have enough bytes for a complete frame
+            if (currentBytes.size < frameLength) {
+                // Not enough data yet, wait for more
+                break
+            }
+
+            // Extract the frame
+            val frame = currentBytes.copyOfRange(0, frameLength)
+            frameNumber++
+            logger?.onFrameExtracted(frame, frameNumber)
+
+            // Keep remaining data
+            val remaining = currentBytes.copyOfRange(frameLength, currentBytes.size)
+            buffer.reset()
+            buffer.write(remaining)
+
+            // Emit the frame
+            emit(frame)
+        }
+    }
+}
+
+/**
+ * Splits the flow into frames using multiple possible preambles.
+ * Useful when you need to detect different frame types with the same length.
+ *
+ * @param preambles List of possible preambles to detect
+ * @param frameLength Total frame length (same for all preamble types)
+ * @param logger Optional logger for debugging
+ * @param maxBufferSize Maximum buffer size before throwing BufferOverflowException
+ *
+ * Example usage:
+ * ```kotlin
+ * // Detect both request (0xAA) and response (0xBB) frames, both 32 bytes
+ * connection.readFlow
+ *     .multiPreambleAndFixedLength(
+ *         preambles = listOf(
+ *             byteArrayOf(0xAA.toByte(), 0x01),  // Request
+ *             byteArrayOf(0xBB.toByte(), 0x02)   // Response
+ *         ),
+ *         frameLength = 32
+ *     )
+ *     .collect { frame ->
+ *         when (frame[0]) {
+ *             0xAA.toByte() -> handleRequest(frame)
+ *             0xBB.toByte() -> handleResponse(frame)
+ *         }
+ *     }
+ * ```
+ */
+fun Flow<ByteArray>.multiPreambleAndFixedLength(
+    preambles: List<ByteArray>,
+    frameLength: Int,
+    logger: PacketFlowLogger? = null,
+    maxBufferSize: Int = DEFAULT_MAX_BUFFER_SIZE
+): Flow<ByteArray> = flow {
+    require(preambles.isNotEmpty()) { "At least one preamble required" }
+    require(preambles.all { it.isNotEmpty() }) { "Preambles cannot be empty" }
+    require(frameLength > preambles.maxOf { it.size }) { "frameLength must be > largest preamble size" }
+    require(maxBufferSize >= frameLength) { "maxBufferSize must be >= frameLength" }
+
+    val buffer = ByteArrayOutputStream()
+    var frameNumber = 0
+    val minPreambleSize = preambles.minOf { it.size }
+
+    collect { chunk ->
+        logger?.onRawData(chunk, buffer.size() + chunk.size)
+        buffer.write(chunk)
+        logger?.onBufferUpdate(buffer.toByteArray().toHexString())
+
+        if (buffer.size() > maxBufferSize) {
+            throw BufferOverflowException(
+                "Buffer size ${buffer.size()} exceeded maximum $maxBufferSize bytes"
+            )
+        }
+
+        while (buffer.size() >= frameLength) {
+            val currentBytes = buffer.toByteArray()
+
+            // Find earliest preamble
+            var earliestIndex = -1
+            var matchedPreamble: ByteArray? = null
+            for (preamble in preambles) {
+                val index = findDelimiter(currentBytes, preamble)
+                if (index != -1 && (earliestIndex == -1 || index < earliestIndex)) {
+                    earliestIndex = index
+                    matchedPreamble = preamble
+                }
+            }
+
+            if (earliestIndex == -1) {
+                val keepSize = (minPreambleSize - 1).coerceAtMost(currentBytes.size)
+                val discarded = currentBytes.copyOfRange(0, currentBytes.size - keepSize)
+                if (discarded.isNotEmpty()) {
+                    logger?.onDataDiscarded(discarded, "No preamble found")
+                }
+                buffer.reset()
+                if (keepSize > 0) {
+                    buffer.write(currentBytes.copyOfRange(currentBytes.size - keepSize, currentBytes.size))
+                }
+                break
+            }
+
+            if (earliestIndex > 0) {
+                val discarded = currentBytes.copyOfRange(0, earliestIndex)
+                logger?.onDataDiscarded(discarded, "Data before preamble")
+                val remaining = currentBytes.copyOfRange(earliestIndex, currentBytes.size)
+                buffer.reset()
+                buffer.write(remaining)
+                continue
+            }
+
+            if (currentBytes.size < frameLength) {
+                break
+            }
+
+            val frame = currentBytes.copyOfRange(0, frameLength)
+            frameNumber++
+            logger?.onFrameExtracted(frame, frameNumber)
+
+            val remaining = currentBytes.copyOfRange(frameLength, currentBytes.size)
+            buffer.reset()
+            buffer.write(remaining)
+
+            emit(frame)
+        }
+    }
+}
+
+/**
+ * Extension function to convert ByteArray to hex string for logging.
+ * Format: "24 4E 49 4D 00 01 02 ..."
+ */
+fun ByteArray.toHexString(): String = joinToString(" ") { "%02X".format(it) }
+
+/**
+ * Extension function to convert ByteArray to compact hex string (no spaces).
+ * Format: "244E494D000102..."
+ */
+fun ByteArray.toHexStringCompact(): String = joinToString("") { "%02X".format(it) }
+
+/**
+ * Extension function to create ByteArray from hex string.
+ * Supports both "24 4E 49 4D" and "244E494D" formats.
+ */
+fun String.hexToByteArray(): ByteArray {
+    val hex = this.replace(" ", "").replace("0x", "").replace(",", "")
+    require(hex.length % 2 == 0) { "Hex string must have even length" }
+    return ByteArray(hex.length / 2) { i ->
+        hex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+    }
+}
