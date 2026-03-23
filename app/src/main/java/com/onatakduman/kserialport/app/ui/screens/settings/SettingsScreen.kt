@@ -632,7 +632,7 @@ fun SettingsScreen(
                     HorizontalDivider()
                     ListItem(
                         headlineContent = { Text("Library") },
-                        supportingContent = { Text("kserialport v1.1.8") }
+                        supportingContent = { Text("kserialport v1.1.9") }
                     )
                     HorizontalDivider()
                     ListItem(

@@ -89,7 +89,7 @@ fun AboutScreen(onNavigateBack: () -> Unit) {
                 Column {
                     ListItem(
                         headlineContent = { Text("Library Version") },
-                        supportingContent = { Text("1.1.8") }
+                        supportingContent = { Text("1.1.9") }
                     )
                     HorizontalDivider()
                     ListItem(
