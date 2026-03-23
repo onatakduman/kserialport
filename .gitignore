@@ -35,6 +35,7 @@ captures/
 *.jks
 *.keystore
 *.key
+keystore/
 /.idea/
 
 # Secrets - DO NOT COMMIT
@@ -44,3 +45,5 @@ gpg-key2.asc
 *.kbx
 gradle.maven.properties
 gradle.properties.template
+.claude/
+app/src/main/res/.claude/
