@@ -20,5 +20,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "android-k-serialport"
-include(":app")
 include(":kserialport")
