@@ -36,6 +36,14 @@ class SerialPort(
     }
 
     companion object {
+        /**
+         * True when the bundled native library (libkserialport.so) loaded
+         * successfully. When false, [open] throws [IOException]; USB Host API
+         * connections ([UsbSerialConnection]) are unaffected either way.
+         */
+        val isNativeLibraryLoaded: Boolean
+            get() = SerialPortJNI.isLoaded
+
         const val DATA_BITS_5 = 5
         const val DATA_BITS_6 = 6
         const val DATA_BITS_7 = 7
@@ -99,6 +107,10 @@ class SerialPort(
      * @throws IOException if the port cannot be opened or configured
      */
     fun open(): SerialPortConnection {
+        // Fail fast with a catchable IOException (not UnsatisfiedLinkError)
+        // before prompting for root if the native library isn't available.
+        SerialPortJNI.ensureLoaded()
+
         if (!RootPermissionHelper.grantPermission(path)) {
             throw SecurityException(
                 "Cannot read/write to $path. Ensure you have root access or permissions are set."

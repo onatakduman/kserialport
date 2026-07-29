@@ -96,7 +96,9 @@ class SerialPortConnection(private val fd: FileDescriptor) : Closeable {
         }
         try {
             SerialPortJNI.close(fd)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable, not Exception: a missing native lib surfaces as an
+            // UnsatisfiedLinkError and close() must never crash the host app.
             Log.w(TAG, "Error closing file descriptor", e)
         }
     }
